@@ -1,94 +1,97 @@
 # rhythm-math-c
 
-**The mathematics of rhythm — C99 edition.** Polyrhythms, meters, groove analysis, syncopation metrics, and tempo math for hardware devices, drum machines, sequencers, and embedded audio.
+> Rhythm mathematics in C — polyrhythms, syncopation, groove, meter, and tempo.
 
-A C99 port of [rhythm-nation-math](https://github.com/SuperInstance/rhythm-nation-math). Zero external dependencies.
+## What This Does
 
-## Build
+`rhythm-math-c` provides pure rhythm math in C. Model time signatures, polyrhythms, syncopation (Longuet-Higgins/Lee), groove patterns, and tempo curves. No audio — just the math. Use it for embedded audio systems, game audio engines, or high-performance music analysis.
+
+## The Cultural Root
+
+See `rhythm-nation-math` (PyPI) for the full cultural background. Polyrhythms from West African drumming — math as LCM problems.
+
+## Install
 
 ```bash
-make          # Build static library (librhythmmath.a)
-make test     # Build and run tests
-make clean    # Clean build artifacts
+git clone https://github.com/SuperInstance/rhythm-math-c.git
+cd rhythm-math-c
+make
 ```
 
-## Usage
+## Quick Start
 
 ```c
 #include "rhythm_api.h"
 
-/* Tempo */
-double ms = tempo_bpm_to_ms(120.0);  // 500.0
+int main() {
+    // Tempo
+    Tempo t = {.bpm = 120.0};
+    printf("ms/beat: %.1f\n", tempo_bpm_to_ms(120.0));  // 500.0
+    printf("Hz: %.2f\n", tempo_hz(&t));                  // 2.0
 
-/* Polyrhythm */
-Polyrhythm p = {.rates = {3, 2}, .count = 2};
-int cycle = polyrhythm_cycle_length(&p);  // 6
+    // Tempo curve
+    double curve[8];
+    tempo_curve_linear(120.0, 60.0, 8, curve);
 
-/* Meter */
-Meter m = {4, 4};
-int beats = meter_beat_count(&m);  // 4
+    // Polyrhythm
+    Polyrhythm pr = {.rates = {3, 2}, .count = 2};
+    int cycle_len = polyrhythm_cycle_length(&pr);  // 6
+    int *pattern = polyrhythm_pattern(&pr);
+    double density = polyrhythm_density(&pr);
 
-/* Syncopation */
-int pattern[] = {0, 1, 0, 1, 0, 1, 0, 1};
-double score = syncopation_score(pattern, 8, 4);
+    // Syncopation
+    int rhythm[] = {1, 0, 0, 1, 0, 0, 1, 0};
+    double sync = syncopation_score(rhythm, 8, 4);
+    double offbeat = offbeat_density(rhythm, 8, 4);
+    double entropy = rhythmic_entropy(rhythm, 8);
 
-/* Groove */
-double grid[] = {0.0, 0.5, 1.0, 1.5};
-double *swung = swing_apply(grid, 4, 0.5);
+    // Meter
+    Meter m = {.numerator = 7, .denominator = 8};
+    printf("Odd: %d\n", meter_is_odd(&m));  // 1
+
+    // Groove
+    GroovePattern g = {.velocities = {100, 80, 90, 70}, .count = 4};
+    double avg_vel = groove_average_velocity(&g);
+
+    return 0;
+}
 ```
 
-## Modules
+## API Reference
 
-| Module | Header | Description |
-|--------|--------|-------------|
-| Tempo | `tempo.h` | BPM↔ms conversion, frequency, tempo curves (linear/exponential/logarithmic) |
-| Polyrhythm | `polyrhythm.h` | LCM cycle length, binary patterns, density, complexity |
-| Groove | `groove.h` | Swing, velocity mapping, microtiming humanization |
-| Syncopation | `syncopation.h` | Longuet-Higgins/Lee syncopation, offbeat density, rhythmic entropy |
-| Meter | `meter.h` | Time signatures, simple/compound/odd detection, downbeats, subdivisions |
-| API | `rhythm_api.h` | Unified include for all modules |
+### Tempo (`tempo.h`)
+- `double tempo_bpm_to_ms(double bpm)`
+- `double tempo_ms_to_bpm(double ms)`
+- `double tempo_hz(const Tempo *t)`
+- `double tempo_period(const Tempo *t)`
+- `double *tempo_curve_linear(double start, double end, int steps, double *out)`
+- `double *tempo_curve_exponential(double start, double end, int steps, double *out)`
+- `double *tempo_curve_logarithmic(double start, double end, int steps, double *out)`
 
-## API
+### Polyrhythm (`polyrhythm.h`)
+- `int polyrhythm_cycle_length(const Polyrhythm *p)`
+- `int *polyrhythm_pattern(const Polyrhythm *p)`
+- `double polyrhythm_density(const Polyrhythm *p)`
+- `double polyrhythm_complexity(const Polyrhythm *p)`
+- `int polyrhythm_lcm2(int a, int b)`
 
-### Tempo
+### Syncopation (`syncopation.h`)
+- `double syncopation_score(const int *pattern, int length, int meter_numerator)`
+- `double offbeat_density(const int *pattern, int length, int meter_numerator)`
+- `double rhythmic_entropy(const int *pattern, int length)`
 
-- `tempo_bpm_to_ms(bpm)` — BPM → milliseconds per beat
-- `tempo_ms_to_bpm(ms)` — milliseconds per beat → BPM
-- `tempo_hz(&t)` — frequency in Hz
-- `tempo_period(&t)` — period in seconds
-- `tempo_curve_linear(start, end, steps)` — linear tempo ramp (caller frees)
-- `tempo_curve_exponential(start, end, steps)` — exponential ramp (caller frees)
-- `tempo_curve_logarithmic(start, end, steps)` — logarithmic ramp (caller frees)
+### Meter (`meter.h`)
+- `int meter_is_simple(const Meter *m)`
+- `int meter_is_compound(const Meter *m)`
+- `int meter_is_odd(const Meter *m)`
+- `int meter_beat_count(const Meter *m)`
+- `int *meter_downbeats(int measures, const Meter *m)`
 
-### Polyrhythm
-
-- `polyrhythm_cycle_length(&p)` — LCM of all rates
-- `polyrhythm_pattern(&p)` — flat int array, count × cycle_length (caller frees)
-- `polyrhythm_density(&p)` — total hits / cycle length
-- `polyrhythm_complexity(&p)` — cycle length / sum of rates
-- `polyrhythm_combined_cycle(rates, count)` — OR of all voices (caller frees)
-
-### Groove
-
-- `groove_average_velocity(&g)` — mean velocity
-- `swing_apply(grid, length, amount)` — apply swing to beat positions (caller frees)
-- `groove_velocity(pattern, length, accents)` — binary → MIDI velocity (caller frees)
-- `microtiming_humanize(offsets, length, amount, seed)` — gaussian humanization (caller frees)
-
-### Syncopation
-
-- `syncopation_score(pattern, length, meter)` — Longuet-Higgins/Lee measure
-- `offbeat_density(pattern, length, meter)` — fraction of off-beat hits
-- `rhythmic_entropy(pattern, length)` — Shannon entropy of intervals
-
-### Meter
-
-- `meter_is_simple(&m)` / `meter_is_compound(&m)` / `meter_is_odd(&m)`
-- `meter_beat_count(&m)` — main beats per measure
-- `meter_subdivision(&m)` — subdivisions per beat
-- `meter_downbeats(measures, &m)` — downbeat positions (caller frees)
-- `meter_subdivisions(&m, level, &count)` — subdivision grid (caller frees)
-- `time_signature_changes(meters, count, repeats, &out_count)` — meter sequence (caller frees)
+### Groove (`groove.h`)
+- `double groove_average_velocity(const GroovePattern *g)`
+- `double *swing_apply(const double *grid, int length, double amount)`
+- `int *groove_velocity(const int *pattern, int length, const int *accent_pattern)`
+- `double *microtiming_humanize(const double *offsets, int length, double amount, unsigned int seed)`
 
 ## License
 
